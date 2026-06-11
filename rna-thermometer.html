@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RNA thermometer — interactive</title>
+<style>
+  :root{
+    --paper:#FAF7F1; --panel:#FFFFFF; --ink:#2A2723; --muted:#6E665B;
+    --line:#E7E0D3; --cold:#2F6FB0; --coldlite:#3B8BD4; --hot:#CC551F;
+    --hotlite:#E0703A; --structure:#8A8378; --strand:#A59C8C;
+    --accent:#CC551F; --good:#3B7D4F;
+    --r:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#17150F; --panel:#201D17; --ink:#ECE6DA; --muted:#A79E8E;
+      --line:#34302A; --cold:#5B9BD9; --coldlite:#6FB0EC; --hot:#E0703A;
+      --hotlite:#EE8C53; --structure:#9A9384; --strand:#7A7263;
+      --accent:#E0703A; --good:#6FB98A;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:780px; margin:0 auto; padding:22px 20px 30px}
+  .eyebrow{font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); font-weight:600; margin:0 0 4px}
+  h1{font-family:Georgia,"Times New Roman",serif; font-weight:600; font-size:25px; line-height:1.2; margin:0 0 6px}
+  .lede{color:var(--muted); font-size:14.5px; margin:0 0 18px; max-width:62ch}
+
+  .modebar{display:flex; gap:8px; margin:0 0 14px; flex-wrap:wrap}
+  .modebtn{
+    appearance:none; border:1px solid var(--line); background:var(--panel); color:var(--ink);
+    font:inherit; font-size:13.5px; padding:8px 13px; border-radius:999px; cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .modebtn[aria-pressed="true"]{border-color:var(--accent); background:color-mix(in srgb,var(--accent) 12%, var(--panel)); color:var(--ink); font-weight:500}
+  .modebtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  .stage{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
+    padding:14px 14px 6px; margin:0 0 14px;
+  }
+  .scene{width:100%; height:auto; display:block}
+
+  .panels{display:grid; grid-template-columns:1.35fr 1fr; gap:14px; align-items:stretch}
+  @media (max-width:620px){ .panels{grid-template-columns:1fr} }
+
+  .controls{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .temprow{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+  .tempval{font-family:Georgia,serif; font-size:30px; font-weight:600; color:var(--accent); line-height:1}
+  .tempval span{font-size:16px; color:var(--muted); font-family:inherit}
+  .slabel{font-size:12.5px; color:var(--muted)}
+  input[type=range]{width:100%; accent-color:var(--accent); height:24px; cursor:pointer}
+  .ticks{display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:-4px}
+
+  .readouts{display:flex; gap:10px; margin-top:2px}
+  .ro{flex:1; background:color-mix(in srgb,var(--ink) 4%, var(--panel)); border:1px solid var(--line); border-radius:8px; padding:8px 10px}
+  .ro .k{font-size:11px; color:var(--muted); margin:0 0 3px; letter-spacing:.02em}
+  .ro .v{font-size:16px; font-weight:600; font-variant-numeric:tabular-nums}
+
+  .curvebox{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:12px 12px 8px; display:flex; flex-direction:column}
+  .curvetitle{font-size:12.5px; color:var(--muted); margin:0 0 4px}
+
+  .sweep{
+    appearance:none; border:1px solid var(--line); background:var(--panel); color:var(--ink);
+    font:inherit; font-size:13px; padding:7px 12px; border-radius:8px; cursor:pointer; align-self:flex-start;
+  }
+  .sweep:hover{border-color:var(--accent)}
+  .sweep:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  .caption{
+    margin:12px 0 0; padding:11px 14px; border-left:3px solid var(--accent);
+    background:color-mix(in srgb,var(--accent) 7%, var(--panel)); border-radius:0 8px 8px 0;
+    font-size:14px; color:var(--ink);
+  }
+  .foot{font-size:12px; color:var(--muted); margin:16px 0 0}
+  text{font-family:system-ui,sans-serif}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Biochemistry &amp; climate change</p>
+  <h1>RNA thermometers: melting a structural switch</h1>
+  <p class="lede">A temperature-responsive hairpin in the 5′ untranslated region masks the ribosome's access to the message. Raise the temperature to melt the hairpin and watch translation switch on. Compare how bacteria and eukaryotes couple the same thermodynamic switch to the ribosome.</p>
+
+  <div class="modebar" role="group" aria-label="Translation system">
+    <button class="modebtn" id="m-bac" aria-pressed="true" onclick="setMode('bacterial')">Bacterial · Shine–Dalgarno occlusion</button>
+    <button class="modebtn" id="m-euk" aria-pressed="false" onclick="setMode('eukaryotic')">Eukaryotic · cap-scanning (PIF7)</button>
+  </div>
+
+  <div class="stage">
+    <svg class="scene" viewBox="0 0 720 250" role="img" aria-labelledby="scTitle scDesc" id="scene">
+      <title id="scTitle">RNA thermometer mechanism</title>
+      <desc id="scDesc">A 5-prime UTR hairpin that melts as temperature rises, exposing the ribosome binding site so the ribosome engages and translation proceeds.</desc>
+
+      <!-- heat shimmer -->
+      <g id="heat" opacity="0">
+        <path d="M600 30 q9 -9 18 0 q9 9 18 0" fill="none" stroke="var(--hot)" stroke-width="1.6"/>
+        <path d="M600 42 q9 -9 18 0 q9 9 18 0" fill="none" stroke="var(--hot)" stroke-width="1.6" opacity="0.6"/>
+      </g>
+
+      <!-- 5' end / cap -->
+      <text id="endLabel" class="lbl" x="60" y="158" text-anchor="middle" font-size="13" fill="var(--muted)">5′</text>
+      <circle id="cap" cx="60" cy="135" r="9" fill="var(--structure)" opacity="0"/>
+
+      <!-- strand -->
+      <line id="strand" x1="74" y1="135" x2="668" y2="135" stroke="var(--strand)" stroke-width="2.4" stroke-linecap="round"/>
+      <text x="678" y="140" font-size="13" fill="var(--muted)">3′</text>
+
+      <!-- exposed RBS segment (bacterial) -->
+      <line id="rbsSeg" x1="300" y1="135" x2="346" y2="135" stroke="var(--hot)" stroke-width="6" stroke-linecap="round" opacity="0"/>
+      <text id="rbsLbl" x="323" y="172" text-anchor="middle" font-size="12" fill="var(--muted)" opacity="0">Shine–Dalgarno exposed</text>
+
+      <!-- AUG tick -->
+      <line id="augTick" x1="404" y1="126" x2="404" y2="144" stroke="var(--good)" stroke-width="3.5" stroke-linecap="round"/>
+      <text x="404" y="160" text-anchor="middle" font-size="12" fill="var(--muted)">AUG</text>
+
+      <!-- base-pair rungs -->
+      <g id="rungs" stroke="var(--coldlite)" stroke-width="1.1"></g>
+      <!-- hairpin -->
+      <path id="hairpin" fill="none" stroke="var(--coldlite)" stroke-width="2.4"/>
+      <text id="hpLbl" x="323" y="40" text-anchor="middle" font-size="12" fill="var(--muted)">base-paired hairpin</text>
+
+      <!-- ribosome -->
+      <g id="ribo">
+        <ellipse id="riboLarge" cx="0" cy="-22" rx="34" ry="20" fill="color-mix(in srgb,var(--structure) 22%, var(--panel))" stroke="var(--structure)" stroke-width="1"/>
+        <ellipse id="riboSmall" cx="0" cy="2" rx="29" ry="16" fill="color-mix(in srgb,var(--structure) 14%, var(--panel))" stroke="var(--structure)" stroke-width="1"/>
+        <text id="riboName" x="0" y="-8" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--ink)">70S</text>
+      </g>
+
+      <!-- blocked X -->
+      <g id="blockX" opacity="0" stroke="#D6453F" stroke-width="2.4" stroke-linecap="round">
+        <line x1="-7" y1="-7" x2="7" y2="7"/><line x1="7" y1="-7" x2="-7" y2="7"/>
+      </g>
+
+      <!-- translation / nascent chain -->
+      <g id="translate" opacity="0">
+        <line x1="430" y1="135" x2="560" y2="135" stroke="var(--good)" stroke-width="2" stroke-dasharray="4 4"/>
+        <path id="nascent" d="M560 135 q10 -16 20 0 q10 16 20 0 q10 -16 20 0" fill="none" stroke="var(--good)" stroke-width="2"/>
+        <text x="512" y="118" text-anchor="middle" font-size="12" fill="var(--good)">translation</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="panels">
+    <div class="controls">
+      <div class="temprow">
+        <div>
+          <div class="slabel">Temperature</div>
+          <div class="tempval"><span id="tprefix"></span><span style="font-size:30px;color:var(--accent)" id="tnum">25</span> <span>°C</span></div>
+        </div>
+        <button class="sweep" id="sweepBtn" onclick="toggleSweep()">▶ Sweep</button>
+      </div>
+      <input type="range" id="temp" min="20" max="45" step="0.1" value="25" aria-label="Temperature in degrees Celsius">
+      <div class="ticks"><span id="tmin">20 °C</span><span id="tmid"></span><span id="tmax">45 °C</span></div>
+
+      <div class="readouts">
+        <div class="ro"><div class="k">Base pairs intact</div><div class="v" id="roPaired">—</div></div>
+        <div class="ro"><div class="k">Translation output</div><div class="v" id="roOut">—</div></div>
+      </div>
+    </div>
+
+    <div class="curvebox">
+      <div class="curvetitle">Melting curve — translation vs. temperature</div>
+      <svg viewBox="0 0 240 150" role="img" aria-label="Sigmoidal curve of translation output against temperature, with a marker at the current temperature">
+        <line x1="34" y1="118" x2="228" y2="118" stroke="var(--line)" stroke-width="1"/>
+        <line x1="34" y1="14" x2="34" y2="118" stroke="var(--line)" stroke-width="1"/>
+        <path id="curve" fill="none" stroke="var(--accent)" stroke-width="2"/>
+        <line id="tmLine" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" y1="14" y2="118"/>
+        <text id="tmTxt" font-size="10" fill="var(--muted)" text-anchor="middle"></text>
+        <circle id="dot" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="1.5"/>
+        <text x="131" y="140" font-size="11" fill="var(--muted)" text-anchor="middle">temperature →</text>
+        <text x="14" y="66" font-size="11" fill="var(--muted)" text-anchor="middle" transform="rotate(-90 14 66)">output</text>
+      </svg>
+    </div>
+  </div>
+
+  <p class="caption" id="caption">—</p>
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var MODES = {
+    bacterial: {
+      Tm:37, k:2.0, min:20, max:45, start:25,
+      cap:false, riboName:'70S', showLarge:true,
+      rbsText:'Shine–Dalgarno exposed',
+      hpText:'base-paired hairpin',
+      park:-205, dock:0, riboHomeX:323, riboBaseY:135,
+      foot:'Canonical bacterial RNATs (ROSE, FourU, prfA) sequester the Shine–Dalgarno sequence and start codon in a hairpin; melting near host temperature frees the ribosome binding site.',
+      states:[
+        'Hairpin folded — the Shine–Dalgarno sequence is base-paired and the 30S subunit cannot dock. Translation off.',
+        'Hairpin partially melting — base pairs are breaking and the ribosome binding site is becoming accessible.',
+        'Hairpin melted — the Shine–Dalgarno sequence is exposed, the ribosome assembles on the message, and translation proceeds.'
+      ]
+    },
+    eukaryotic: {
+      Tm:22, k:1.8, min:12, max:32, start:16,
+      cap:true, riboName:'40S', showLarge:false,
+      rbsText:'',
+      hpText:'5′-UTR hairpin',
+      park:-70, dock:0, riboHomeX:392, riboBaseY:135, scanStall:250,
+      foot:'The validated eukaryotic example is Arabidopsis PIF7 (Chung et al., Nat. Plants 2020). With no Shine–Dalgarno sequence, the 40S subunit loads at the m⁷G cap and scans; the hairpin obstructs scanning until warmth relaxes it.',
+      states:[
+        'Stable 5′-UTR hairpin blocks the scanning 40S subunit. Little PIF7 is made.',
+        'Hairpin loosening — the scanning subunit begins to advance past the structured region.',
+        'Hairpin relaxed — the 40S subunit scans through to the AUG, PIF7 is translated, and the warm-growth (thermomorphogenesis) program is induced.'
+      ]
+    }
+  };
+
+  var mode = 'bacterial';
+  var T = MODES[mode].start;
+  var sweeping = false, sweepRAF = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var slider=$('temp');
+
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+  function smooth(x,a,b){ x=clamp((x-a)/(b-a),0,1); return x*x*(3-2*x); }
+  function sig(t,Tm,k){ return 1/(1+Math.exp(-(t-Tm)/k)); }
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function hx(n){ n=Math.round(clamp(n,0,255)).toString(16); return n.length<2?'0'+n:n; }
+  function mix(c1,c2,t){
+    return '#'+hx(lerp(c1[0],c2[0],t))+hx(lerp(c1[1],c2[1],t))+hx(lerp(c1[2],c2[2],t));
+  }
+  var COLD=[59,139,212], HOT=[214,90,48];
+
+  function setMode(m){
+    mode=m;
+    var cfg=MODES[m];
+    $('m-bac').setAttribute('aria-pressed', m==='bacterial');
+    $('m-euk').setAttribute('aria-pressed', m==='eukaryotic');
+    slider.min=cfg.min; slider.max=cfg.max; slider.value=cfg.start;
+    T=cfg.start;
+    $('tmin').textContent=cfg.min+' °C';
+    $('tmax').textContent=cfg.max+' °C';
+    $('tmid').textContent=Math.round((cfg.min+cfg.max)/2)+' °C';
+    $('endLabel').style.display = cfg.cap ? 'none':'block';
+    $('cap').setAttribute('opacity', cfg.cap?1:0);
+    $('riboLarge').style.display = cfg.showLarge ? 'block':'none';
+    $('riboName').textContent = cfg.riboName;
+    $('hpLbl').textContent = cfg.hpText;
+    $('foot').textContent = cfg.foot;
+    render();
+  }
+  window.setMode=setMode;
+
+  function buildRungs(xL,xR,topY,botY,p){
+    var g=$('rungs'); g.innerHTML='';
+    var n=4, op=Math.pow(1-p,1.3);
+    if(op<0.02) return;
+    for(var i=0;i<n;i++){
+      var y=lerp(topY+10, botY-6, i/(n-1));
+      var ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+      ln.setAttribute('x1',xL+3); ln.setAttribute('x2',xR-3);
+      ln.setAttribute('y1',y); ln.setAttribute('y2',y);
+      ln.setAttribute('opacity',op.toFixed(3));
+      g.appendChild(ln);
+    }
+  }
+
+  function render(){
+    var cfg=MODES[mode];
+    var p=sig(T,cfg.Tm,cfg.k);              // fraction open
+    var col=mix(COLD,HOT,p);
+
+    // temperature display
+    $('tnum').textContent = T.toFixed(T%1?1:0).replace(/\.0$/,'');
+    $('roPaired').textContent = Math.round((1-p)*100)+'%';
+    $('roOut').textContent = Math.round(p*100)+'%';
+
+    // hairpin morph
+    var xL=300, xR=346, mid=(xL+xR)/2, base=135;
+    var apexY = lerp(45, 128, p);
+    var loopRy = lerp(20, 4, p);
+    var d = 'M '+xL+' '+base+' L '+xL+' '+apexY+
+            ' A '+((xR-xL)/2)+' '+loopRy+' 0 0 1 '+xR+' '+apexY+
+            ' L '+xR+' '+base;
+    var hp=$('hairpin'); hp.setAttribute('d',d); hp.setAttribute('stroke',col);
+    $('hpLbl').setAttribute('opacity', (1-p*1.1).toFixed(2));
+    $('hpLbl').setAttribute('y', (apexY-loopRy-8).toFixed(0));
+    buildRungs(xL,xR,apexY,base,p);
+    $('rungs').setAttribute('stroke',col);
+
+    // heat shimmer
+    $('heat').setAttribute('opacity', smooth(p,0.45,0.95).toFixed(2));
+
+    // RBS exposure (bacterial only)
+    if(!cfg.cap){
+      $('rbsSeg').setAttribute('opacity', p.toFixed(2));
+      $('rbsLbl').setAttribute('opacity', smooth(p,0.5,0.85).toFixed(2));
+      $('rbsLbl').textContent=cfg.rbsText;
+    } else {
+      $('rbsSeg').setAttribute('opacity',0);
+      $('rbsLbl').setAttribute('opacity',0);
+    }
+
+    // AUG highlight when reached
+    var reached=smooth(p,0.55,0.9);
+    $('augTick').setAttribute('stroke', reached>0.5?'var(--good)':'var(--muted)');
+
+    // ribosome placement
+    var ribo=$('ribo');
+    var dockProg=smooth(p,0.30,0.72);
+    var rx, ry;
+    if(!cfg.cap){
+      rx = lerp(cfg.riboHomeX+cfg.park, cfg.riboHomeX, dockProg);
+      ry = cfg.riboBaseY-30 + lerp(34,0,dockProg);   // parked low-left, lifts to dock
+    } else {
+      rx = lerp(cfg.scanStall, cfg.riboHomeX, dockProg);
+      ry = cfg.riboBaseY-22;
+    }
+    ribo.setAttribute('transform','translate('+rx.toFixed(1)+','+ry.toFixed(1)+')');
+
+    // blocked X (near hairpin), fades as it opens
+    var bx=$('blockX');
+    var blockOp = (1-smooth(p,0.18,0.5));
+    bx.setAttribute('opacity', blockOp.toFixed(2));
+    bx.setAttribute('transform','translate('+(cfg.cap?282:288)+','+(base-2)+')');
+
+    // translation / nascent chain
+    $('translate').setAttribute('opacity', smooth(p,0.6,0.9).toFixed(2));
+
+    // melting curve + marker
+    drawCurve(cfg,p);
+
+    // caption + sweep button colorize
+    var idx = p<0.28?0 : (p<0.62?1:2);
+    $('caption').textContent = cfg.states[idx];
+    $('caption').style.borderLeftColor = col;
+    $('caption').style.background = 'color-mix(in srgb,'+col+' 9%, var(--panel))';
+    document.documentElement.style.setProperty('--accent', col);
+  }
+
+  function drawCurve(cfg,p){
+    var x0=34,x1=228,y0=118,y1=18;
+    var pts=[];
+    for(var i=0;i<=60;i++){
+      var t=cfg.min+(cfg.max-cfg.min)*i/60;
+      var v=sig(t,cfg.Tm,cfg.k);
+      pts.push((x0+(x1-x0)*i/60).toFixed(1)+' '+(y0+(y1-y0)*v).toFixed(1));
+    }
+    $('curve').setAttribute('d','M '+pts.join(' L '));
+    var tx=x0+(x1-x0)*(T-cfg.min)/(cfg.max-cfg.min);
+    var ty=y0+(y1-y0)*p;
+    $('dot').setAttribute('cx',tx.toFixed(1)); $('dot').setAttribute('cy',ty.toFixed(1));
+    var tmx=x0+(x1-x0)*(cfg.Tm-cfg.min)/(cfg.max-cfg.min);
+    $('tmLine').setAttribute('x1',tmx.toFixed(1)); $('tmLine').setAttribute('x2',tmx.toFixed(1));
+    $('tmTxt').setAttribute('x',tmx.toFixed(1)); $('tmTxt').setAttribute('y',12);
+    $('tmTxt').textContent='Tm '+cfg.Tm+'°';
+  }
+
+  slider.addEventListener('input', function(){
+    if(sweeping) stopSweep();
+    T=parseFloat(slider.value); render();
+  });
+
+  function toggleSweep(){ sweeping?stopSweep():startSweep(); }
+  window.toggleSweep=toggleSweep;
+  function startSweep(){
+    var cfg=MODES[mode];
+    sweeping=true; $('sweepBtn').textContent='⏸ Pause';
+    if(reduce){ // jump to fully open for reduced-motion users
+      T=cfg.max; slider.value=T; render(); stopSweep(); return;
+    }
+    var dir=1, last=performance.now();
+    function step(now){
+      if(!sweeping) return;
+      var dt=(now-last)/1000; last=now;
+      T += dir*(cfg.max-cfg.min)*0.28*dt;
+      if(T>=cfg.max){T=cfg.max; dir=-1;}
+      if(T<=cfg.min){T=cfg.min; dir=1;}
+      slider.value=T; render();
+      sweepRAF=requestAnimationFrame(step);
+    }
+    sweepRAF=requestAnimationFrame(step);
+  }
+  function stopSweep(){
+    sweeping=false; $('sweepBtn').textContent='▶ Sweep';
+    if(sweepRAF) cancelAnimationFrame(sweepRAF);
+  }
+
+  setMode('bacterial');
+})();
+</script>
+</body>
+</html>
